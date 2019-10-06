@@ -73,6 +73,30 @@ init_before_build() {
     fi
 }
 
+add_config_jwt() {
+    if [ -e "$WP_CORE/wp-config.php" ]; then
+        echo "add jwt config ..."
+        cat "$WP_CORE/wp-config.php" | grep "JWT_AUTH_SECRET_KEY" > /dev/null;
+
+        if [ "$?" == "0" ]; then
+            echo "JWT_AUTH_SECRET_KEY already set, ignored ..."
+        else
+            #TODO: need to add the config before this line, see: https://github.com/Tmeister/wp-api-jwt-auth/issues/59
+            ln=$(cat "$WP_CORE/wp-config.php" | grep -n "require_once( ABSPATH . 'wp-settings.php' );" | cut -d":" -f1)
+
+            if [ "$?" == 0 ]; then
+                rand=$(openssl rand -base64 12)
+                jwt_config="define('JWT_AUTH_SECRET_KEY', '$rand');"
+
+                sed -i "$ln"i" $jwt_config" "$WP_CORE/wp-config.php"
+            else
+                echo "error by adding jwt config, exit"
+                exit 0
+            fi
+        fi
+    fi
+}
+
 wait_for_build() {
     docker-compose up -d
     echo 'waiting for init ...'
@@ -81,7 +105,15 @@ wait_for_build() {
         # sleep 2 seconds
         echo 'waiting...' && sleep 2
     done
+
+    #TODO: why the access right is modified? in centos7
+    chown 33:tape -R "$WP_CONTENT"
     echo 'finished init'
+
+    echo "copy .htaccess to $WP_CORE"
+    cp .htaccess "$WP_CORE/"
+
+    add_config_jwt;
 }
 
 # no plugins
@@ -122,16 +154,6 @@ else
 
     # 3) install all-in-one-migration
     docker-compose run --rm wpcli plugin install "all-in-one-wp-migration" --activate
-
-    if [ $? ]; then
-        echo "<IfModule mod_rewrite.c>
-RewriteEngine on
-RewriteCond %{HTTP:Authorization} ^(.*)
-RewriteRule ^(.*) - [E=HTTP_AUTHORIZATION:%1]
-</IfModule>" >>"$WP_CORE/.htaccess"
-
-        
-    fi
 
     exit 0
 fi
