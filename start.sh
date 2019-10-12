@@ -57,8 +57,17 @@ init_before_build() {
         exit 1
     fi
 
-    echo "creating .env file ..."
-    cat ".env.sample" | grep -v "#" | sed '/^[[:space:]]*$/d' >".env"
+    echo "creating .env file ..." &&
+        cat ".env.sample" | grep -v "#" | sed '/^[[:space:]]*$/d' >".env"
+
+    echo "replace domain via given URL ..." &&
+        domain="$URL" && domain=${domain#*//}
+
+    if [ "$?" == 0 ]; then
+        sed '/DOMAINS=/d' ".env" >".env.tmp" && mv ".env.tmp" ".env" && echo "DOMAINS=$domain" >>".env"
+    else
+        echo "error by replacing domain, exit" && exit 1
+    fi
 
     while IFS="=" read -r key value; do
         case "$key" in
@@ -76,7 +85,7 @@ init_before_build() {
 add_config_jwt() {
     if [ -e "$WP_CORE/wp-config.php" ]; then
         echo "add jwt config ..."
-        cat "$WP_CORE/wp-config.php" | grep "JWT_AUTH_SECRET_KEY" > /dev/null;
+        cat "$WP_CORE/wp-config.php" | grep "JWT_AUTH_SECRET_KEY" >/dev/null
 
         if [ "$?" == "0" ]; then
             echo "JWT_AUTH_SECRET_KEY already set, ignored ..."
@@ -91,7 +100,7 @@ add_config_jwt() {
                 sed -i "$ln"i" $jwt_config" "$WP_CORE/wp-config.php"
             else
                 echo "error by adding jwt config, exit"
-                exit 0
+                exit 1
             fi
         fi
     fi
@@ -151,9 +160,6 @@ else
         --admin_user="admin" \
         --admin_password="admin" \
         --admin_email="$LETSENCRYPT_EMAIL"
-
-    # 3) install all-in-one-migration
-    docker-compose run --rm wpcli plugin install "all-in-one-wp-migration" --activate
 
     exit 0
 fi
