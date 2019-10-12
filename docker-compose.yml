@@ -16,8 +16,8 @@ services:
    wordpress:
      depends_on:
        - db
-     ports:
-       - "8000:80"
+     #ports:
+     #  - "8000:80"
      container_name: ${CONTAINER_WP_NAME}
      image: wordpress:latest
      restart: unless-stopped
@@ -58,7 +58,7 @@ services:
        - "./entrypoint.sh:/entrypoint.sh"
      entrypoint: /entrypoint.sh -d db:3306,wordpress:80 -c 'echo "web service started ..."';
 
-#networks:
-#    default:
-#       external:
-#         name: ${NETWORK}
+networks:
+    default:
+       external:
+         name: ${NETWORK}
